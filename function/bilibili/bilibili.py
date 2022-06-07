@@ -38,9 +38,25 @@ class BiliBiliCheckIn(object):
     @staticmethod
     def reward(session) -> dict:
         """取B站经验信息"""
-        url = "https://account.bilibili.com/home/reward"
+        # url = "https://account.bilibili.com/home/reward"
+        url = "https://api.bilibili.com/x/member/web/exp/reward"
         ret = session.get(url=url).json()
         return ret
+    
+    @staticmethod
+    def coin_today_exp(session) -> dict:
+        """取B站硬币经验信息"""
+        url = "https://api.bilibili.com/x/web-interface/coin/today/exp"
+        ret = session.get(url=url).json()
+        return ret
+    
+    @staticmethod
+    def vip_privilege_my(session) -> dict:
+        """取B站大会员硬币经验信息"""
+        url = "https://api.bilibili.com/x/vip/privilege/my"
+        ret = session.get(url=url).json()
+        return ret
+    
 
     @staticmethod
     def live_sign(session) -> dict:
@@ -85,6 +101,14 @@ class BiliBiliCheckIn(object):
         """
         url = "https://api.bilibili.com/x/vip/privilege/receive"
         post_data = {"type": receive_type, "csrf": bili_jct}
+        session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.67 Safari/537.36",
+                "Referer": "https://account.bilibili.com",
+                "Connection": "keep-alive",
+                "sec-fetch-mode": "cors",
+            }
+        )
         ret = session.post(url=url, data=post_data).json()
         return ret
 
@@ -263,8 +287,8 @@ class BiliBiliCheckIn(object):
         requests.utils.add_dict_to_cookiejar(session.cookies, bilibili_cookie)
         session.headers.update(
             {
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/63.0.3239.108",
-                "Referer": "https://www.bilibili.com/",
+                "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.67 Safari/537.36",
+                "Referer": "https://account.bilibili.com",
                 "Connection": "keep-alive",
             }
         )
@@ -277,9 +301,15 @@ class BiliBiliCheckIn(object):
             live_msg = self.live_sign(session=session)
             print(live_msg)
             aid_list = self.get_region(session=session)
+            vip_privilege_my_ret = self.vip_privilege_my(session=session)
+            welfare_list = vip_privilege_my_ret.get("data", {}).get("list",[])
+            for welfare in welfare_list:
+                if welfare.get("state") == 0 and welfare.get("vip_type") == vip_type:
+                    vip_privilege_receive_ret = self.vip_privilege_receive(session=session,bili_jct=bili_jct,receive_type=welfare.get("type"))
+                    print(vip_privilege_receive_ret) # 取消本段输出
             reward_ret = self.reward(session=session)
             # print(reward_ret) # 取消本段输出
-            coins_av_count = reward_ret.get("data", {}).get("coins_av") // 10
+            coins_av_count = reward_ret.get("data", {}).get("coins") // 10
             coin_num = coin_num - coins_av_count
             coin_num = coin_num if coin_num < coin else coin
             print(coin_num)
@@ -342,9 +372,9 @@ class BiliBiliCheckIn(object):
             # print(uname, uid, is_login, new_coin, vip_type, new_current_exp)
             reward_ret = self.reward(session=session)
             login = reward_ret.get("data", {}).get("login")
-            watch_av = reward_ret.get("data", {}).get("watch_av")
-            coins_av = reward_ret.get("data", {}).get("coins_av", 0)
-            share_av = reward_ret.get("data", {}).get("share_av")
+            watch_av = reward_ret.get("data", {}).get("watch")
+            coins_av = reward_ret.get("data", {}).get("coins", 0)
+            share_av = reward_ret.get("data", {}).get("share")
             today_exp = len([one for one in [login, watch_av, share_av] if one]) * 5
             today_exp += coins_av
             update_data = (28800 - new_current_exp) // (today_exp if today_exp else 1)
